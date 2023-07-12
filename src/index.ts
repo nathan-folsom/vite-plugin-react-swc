@@ -2,13 +2,7 @@ import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { SourceMapPayload } from "module";
-import {
-  Output,
-  ParserConfig,
-  ReactConfig,
-  JscTarget,
-  transform,
-} from "@swc/core";
+import { Output, ParserConfig, ReactConfig, JscTarget, transform } from "@swc/core";
 import { PluginOption, UserConfig, BuildOptions } from "vite";
 import { createRequire } from "module";
 
@@ -20,11 +14,9 @@ window.$RefreshReg$ = () => {};
 window.$RefreshSig$ = () => (type) => type;`;
 
 const _dirname =
-  typeof __dirname !== "undefined"
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url));
+  typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
 const resolve = createRequire(
-  typeof __filename !== "undefined" ? __filename : import.meta.url,
+  typeof __filename !== "undefined" ? __filename : import.meta.url
 ).resolve;
 const refreshContentRE = /\$Refresh(?:Reg|Sig)\$\(/;
 
@@ -63,8 +55,8 @@ const react = (_options?: Options): PluginOption[] => {
       name: "vite:react-swc:resolve-runtime",
       apply: "serve",
       enforce: "pre", // Run before Vite default resolve to avoid syscalls
-      resolveId: (id) => (id === runtimePublicPath ? id : undefined),
-      load: (id) =>
+      resolveId: id => (id === runtimePublicPath ? id : undefined),
+      load: id =>
         id === runtimePublicPath
           ? readFileSync(join(_dirname, "refresh-runtime.js"), "utf-8")
           : undefined,
@@ -80,21 +72,16 @@ const react = (_options?: Options): PluginOption[] => {
       }),
       configResolved(config) {
         if (config.server.hmr === false) hmrDisabled = true;
-        const mdxIndex = config.plugins.findIndex(
-          (p) => p.name === "@mdx-js/rollup",
-        );
+        const mdxIndex = config.plugins.findIndex(p => p.name === "@mdx-js/rollup");
         if (
           mdxIndex !== -1 &&
-          mdxIndex >
-            config.plugins.findIndex((p) => p.name === "vite:react-swc")
+          mdxIndex > config.plugins.findIndex(p => p.name === "vite:react-swc")
         ) {
-          throw new Error(
-            "[vite:react-swc] The MDX plugin should be placed before this plugin",
-          );
+          throw new Error("[vite:react-swc] The MDX plugin should be placed before this plugin");
         }
         if (isWebContainer) {
           config.logger.warn(
-            "[vite:react-swc] SWC is currently not supported in WebContainers. You can use the default React plugin instead.",
+            "[vite:react-swc] SWC is currently not supported in WebContainers. You can use the default React plugin instead."
           );
         }
       },
@@ -104,7 +91,7 @@ const react = (_options?: Options): PluginOption[] => {
           attrs: { type: "module" },
           children: preambleCode.replace(
             "__PATH__",
-            config.server!.config.base + runtimePublicPath.slice(1),
+            config.server!.config.base + runtimePublicPath.slice(1)
           ),
         },
       ],
@@ -156,7 +143,7 @@ RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
           name: "vite:react-swc",
           apply: "build",
           enforce: "pre", // Run before esbuild
-          config: (userConfig) => ({
+          config: userConfig => ({
             build: silenceUseClientWarning(userConfig),
           }),
           transform: (code, _id) =>
@@ -168,7 +155,7 @@ RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
       : {
           name: "vite:react-swc",
           apply: "build",
-          config: (userConfig) => ({
+          config: userConfig => ({
             build: silenceUseClientWarning(userConfig),
             esbuild: {
               jsx: "automatic",
@@ -187,7 +174,7 @@ const transformWithOptions = async (
   code: string,
   target: JscTarget,
   options: Options,
-  reactConfig: ReactConfig,
+  reactConfig: ReactConfig
 ) => {
   const decorators = options?.tsDecorators ?? false;
   const parser: ParserConfig | undefined = id.endsWith(".tsx")
@@ -195,10 +182,9 @@ const transformWithOptions = async (
     : id.endsWith(".ts")
     ? { syntax: "typescript", tsx: false, decorators }
     : id.endsWith(".jsx")
-    ? { syntax: "ecmascript", jsx: true }
-    : id.endsWith(".mdx")
-    ? // JSX is required to trigger fast refresh transformations, even if MDX already transforms it
-      { syntax: "ecmascript", jsx: true }
+    ? { syntax: "ecmascript", jsx: true, decorators, decoratorsBeforeExport: true }
+    : id.endsWith(".js")
+    ? { syntax: "ecmascript", jsx: false, decorators, decoratorsBeforeExport: true }
     : undefined;
   if (!parser) return;
 
@@ -216,6 +202,7 @@ const transformWithOptions = async (
         transform: {
           useDefineForClassFields: true,
           react: reactConfig,
+          legacyDecorator: true,
         },
       },
     });
@@ -238,10 +225,7 @@ const transformWithOptions = async (
 const silenceUseClientWarning = (userConfig: UserConfig): BuildOptions => ({
   rollupOptions: {
     onwarn(warning, defaultHandler) {
-      if (
-        warning.code === "MODULE_LEVEL_DIRECTIVE" &&
-        warning.message.includes("use client")
-      ) {
+      if (warning.code === "MODULE_LEVEL_DIRECTIVE" && warning.message.includes("use client")) {
         return;
       }
       if (userConfig.build?.rollupOptions?.onwarn) {
